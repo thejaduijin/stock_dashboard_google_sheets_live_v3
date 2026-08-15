@@ -2,24 +2,30 @@ name: 🚀 Stock Dashboard Auto-Deploy
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
-  workflow_dispatch:  # Allows manual trigger from GitHub UI
+    branches: [main]
+  workflow_dispatch:
   schedule:
-    # Run every weekday at 9:30 AM and 3:30 PM IST (market open & close)
-    # IST = UTC+5:30, so 9:30 IST = 4:00 UTC, 15:30 IST = 10:00 UTC
     - cron: "0 4,10 * * 1-5"
 
+# ⬇️ Permissions for GitHub Pages + Artifacts
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# ⬇️ Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
-  build-and-deploy:
-    name: Build & Deploy Stock Dashboard
+  build:
+    name: Build Stock Dashboard
     runs-on: ubuntu-latest
 
     env:
-      # These are injected from GitHub Secrets
       GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -29,34 +35,21 @@ jobs:
       CONFIDENCE_THRESHOLD: ${{ secrets.CONFIDENCE_THRESHOLD || '7' }}
 
     steps:
-      # ─────────────────────────────────────────────
-      # 1. Checkout the repository
-      # ─────────────────────────────────────────────
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      # ─────────────────────────────────────────────
-      # 2. Set up Python environment
-      # ─────────────────────────────────────────────
       - name: 🐍 Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
 
-      # ─────────────────────────────────────────────
-      # 3. Install dependencies
-      # ─────────────────────────────────────────────
       - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          # Fallback: install common packages if requirements.txt is missing
           pip install flask pandas numpy yfinance gspread google-auth openpyxl requests
 
-      # ─────────────────────────────────────────────
-      # 4. Run tests (optional but recommended)
-      # ─────────────────────────────────────────────
       - name: 🧪 Run tests
         run: |
           if [ -f test_*.py ] || [ -f *_test.py ]; then
@@ -66,19 +59,13 @@ jobs:
           fi
         continue-on-error: true
 
-      # ─────────────────────────────────────────────
-      # 5. Execute the Stock Agent (CLI mode)
-      # ─────────────────────────────────────────────
       - name: ▶️ Run Stock Agent Pipeline
         run: |
           echo "🚀 Starting Stock Dashboard Pipeline..."
           python app.py --cli --mode live --source excel --provider ${{ secrets.LLM_PROVIDER || 'openai' }}
           echo "✅ Pipeline completed!"
 
-      # ─────────────────────────────────────────────
-      # 6. Upload generated artifacts
-      # ─────────────────────────────────────────────
-      - name: 📤 Upload build artifacts
+      - name: 📤 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: stock-dashboard-output
@@ -90,14 +77,32 @@ jobs:
             audit.db
           retention-days: 30
 
-      # ─────────────────────────────────────────────
-      # 7. Deploy dashboard.html to GitHub Pages
-      # ─────────────────────────────────────────────
-      - name: 🌐 Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: peaceiris/actions-gh-pages@v4
+      - name: 📁 Prepare Pages folder
+        run: |
+          mkdir -p _site
+          cp dashboard.html _site/index.html
+          # Copy any CSS/JS assets the dashboard needs
+          cp -r *.css *.js _site/ 2>/dev/null || true
+
+      - name: 📤 Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
-          publish_branch: gh-pages
-          exclude_assets: '.github,__pycache__,*.py,*.db,*.json,*.xlsx,*.md,audit.db,output.json,excel_universe.json'
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    permissions:
+      pages: write
+      id-token: write
+
+    steps:
+      - name: 🚀 Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
