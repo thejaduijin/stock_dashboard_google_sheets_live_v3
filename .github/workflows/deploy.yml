@@ -1,4 +1,4 @@
-name: 🚀 Stock Dashboard Auto-Deploy
+name: Stock Dashboard Auto-Deploy
 
 on:
   push:
@@ -9,13 +9,11 @@ on:
   schedule:
     - cron: "0 4,10 * * 1-5"
 
-# ⬇️ Permissions for GitHub Pages + Artifacts
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# ⬇️ Allow only one concurrent deployment
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -35,22 +33,22 @@ jobs:
       CONFIDENCE_THRESHOLD: ${{ secrets.CONFIDENCE_THRESHOLD || '7' }}
 
     steps:
-      - name: 📥 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🐍 Set up Python 3.11
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
 
-      - name: 📦 Install dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install flask pandas numpy yfinance gspread google-auth openpyxl requests
 
-      - name: 🧪 Run tests
+      - name: Run tests
         run: |
           if [ -f test_*.py ] || [ -f *_test.py ]; then
             python -m pytest --tb=short
@@ -59,13 +57,19 @@ jobs:
           fi
         continue-on-error: true
 
-      - name: ▶️ Run Stock Agent Pipeline
+      - name: Run Stock Agent Pipeline
         run: |
-          echo "🚀 Starting Stock Dashboard Pipeline..."
+          echo "Starting Stock Dashboard Pipeline..."
           python app.py --cli --mode live --source excel --provider ${{ secrets.LLM_PROVIDER || 'openai' }}
-          echo "✅ Pipeline completed!"
+          echo "Pipeline completed!"
 
-      - name: 📤 Upload artifacts
+      - name: Generate static dashboard
+        run: |
+          echo "Building static dashboard from output.json..."
+          python build_static_dashboard.py
+          echo "Static dashboard built!"
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: stock-dashboard-output
@@ -73,18 +77,10 @@ jobs:
             output.json
             excel_final_list.xlsx
             excel_universe.json
-            dashboard.html
             audit.db
           retention-days: 30
 
-      - name: 📁 Prepare Pages folder
-        run: |
-          mkdir -p _site
-          cp dashboard.html _site/index.html
-          # Copy any CSS/JS assets the dashboard needs
-          cp -r *.css *.js _site/ 2>/dev/null || true
-
-      - name: 📤 Upload Pages artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
@@ -103,6 +99,6 @@ jobs:
       id-token: write
 
     steps:
-      - name: 🚀 Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
