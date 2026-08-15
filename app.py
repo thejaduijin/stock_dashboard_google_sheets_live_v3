@@ -1,16 +1,20 @@
 """
 app.py
-Local one-click dashboard server. Runs a background thread that walks a
-panel of named agents through a pipeline (Scout -> Technician/Fundamentalist/
-Newsdesk -> Bull/Bear -> Judge -> Messenger), polls-friendly via /status,
-persists an audit trail to SQLite, and fires Telegram BUY alerts.
+Local one-click dashboard server + CLI mode for GitHub Actions.
 
-Run: python app.py   then open http://127.0.0.1:<PORT>
+Modes:
+  - Server mode: python app.py          (runs Flask dashboard on http://127.0.0.1:<PORT>)
+  - CLI mode:   python app.py --cli     (runs pipeline once, outputs files, exits)
+
+Pipeline: Scout -> Technician/Fundamentalist/Newsdesk -> Bull/Bear -> Judge -> Messenger
+Persists audit trail to SQLite, fires Telegram BUY alerts.
 """
 
+import argparse
 import json
 import os
 import sqlite3
+import sys
 import threading
 import time
 import traceback
@@ -123,7 +127,6 @@ STATE_LOCK = threading.Lock()
 RUN_THREAD = None
 
 # Uploaded "Final List" Excel universe - lives in memory + persisted to disk
-# so it survives a server restart. {"sheet": str, "tickers": [...], "filename": str, "uploaded_at": str}
 EXCEL_UNIVERSE = None
 
 
@@ -170,6 +173,8 @@ def log_line(msg):
         s["log"].append(f"{datetime.now().strftime('%H:%M:%S')} {msg}")
         s["log"] = s["log"][-200:]
     update_state(_apply)
+    # Also print to stdout for CI visibility
+    print(f"[LOG] {msg}")
 
 
 def set_agent(agent_id, status=None, stat1=None, stat2=None):
@@ -342,7 +347,7 @@ def run_pipeline(mode, provider=None, source="manual"):
         }))
         log_line(f"Scout: scanned {universe_size}, shortlisted {len(shortlisted)}.")
 
-        # ---------------- Technician / Fundamentalist / Newsdesk (parallel-ish, sequential UI) ----------------
+        # ---------------- Technician / Fundamentalist / Newsdesk ----------------
         set_agent("technician", status="working")
         set_agent("fundamentalist", status="working")
         set_agent("newsdesk", status="working")
@@ -370,7 +375,7 @@ def run_pipeline(mode, provider=None, source="manual"):
         set_agent("newsdesk", status="done", stat1=headlines, stat2=("+" if net_tone >= 0 else "") + str(net_tone))
         log_line(f"Technician/Fundamentalist/Newsdesk: covered {len(shortlisted)} shortlisted names.")
 
-        # ---------------- Bull / Bear / Judge: debate each shortlisted stock ----------------
+        # ---------------- Bull / Bear / Judge ----------------
         set_agent("bull", status="working")
         set_agent("bear", status="working")
         set_agent("judge", status="working")
@@ -459,7 +464,7 @@ def run_pipeline(mode, provider=None, source="manual"):
             if ok:
                 sent_count += 1
 
-        timestamp = data_sources.now_ist_str()
+        timestamp = data_sources.now_ist_str() if hasattr(data_sources, "now_ist_str") else datetime.now().isoformat()
         telegram_send(format_summary_message(fired_rows, engine_used, timestamp))
 
         set_agent("messenger", status="done", stat1=sent_count, stat2=engine_used)
@@ -484,6 +489,11 @@ def run_pipeline(mode, provider=None, source="manual"):
             s["data_timestamp"] = timestamp
         update_state(_finish)
 
+        # Save outputs for GitHub Actions
+        _save_outputs()
+
+        return True
+
     except Exception as e:
         traceback.print_exc()
         def _err(s, msg=str(e)):
@@ -491,6 +501,30 @@ def run_pipeline(mode, provider=None, source="manual"):
             s["error"] = msg
         update_state(_err)
         log_line(f"ERROR: {e}")
+        return False
+
+
+def _save_outputs():
+    """Save pipeline outputs to disk for GitHub Actions artifacts."""
+    # Save verdicts as JSON
+    with STATE_LOCK:
+        verdicts = list(STATE["verdicts"])
+        kpi = dict(STATE["kpi"])
+        engine = STATE.get("engine", "-")
+        timestamp = STATE.get("data_timestamp", datetime.now().isoformat())
+
+    output = {
+        "timestamp": timestamp,
+        "engine": engine,
+        "kpi": kpi,
+        "verdicts": verdicts,
+        "total_verdicts": len(verdicts),
+    }
+
+    with open("output.json", "w") as f:
+        json.dump(output, f, indent=2)
+
+    log_line(f"Outputs saved: {len(verdicts)} verdicts, engine={engine}")
 
 
 def start_run(mode, provider=None, source="manual"):
@@ -512,6 +546,46 @@ def start_run(mode, provider=None, source="manual"):
     RUN_THREAD.start()
 
 
+def run_cli(mode="live", provider=None, source="excel"):
+    """Run the pipeline once in CLI mode and exit. For GitHub Actions."""
+    print(f"\n{'='*60}")
+    print(f"  {BRAND} — CLI Mode")
+    print(f"  Mode: {mode} | Source: {source} | Provider: {provider or 'auto'}")
+    print(f"{'='*60}\n")
+
+    # Refresh data source
+    if source == "excel":
+        try:
+            refresh_excel_universe_from_google()
+            print(f"✅ Google Sheets refreshed: {len(EXCEL_UNIVERSE['tickers'])} tickers")
+        except Exception as e:
+            print(f"⚠️ Google Sheets failed: {e}")
+            if not refresh_excel_universe_from_workbook():
+                print("❌ No Excel fallback available. Exiting.")
+                sys.exit(1)
+            print(f"✅ Excel fallback loaded: {len(EXCEL_UNIVERSE['tickers'])} tickers")
+
+    # Run pipeline synchronously
+    success = run_pipeline(mode, provider=provider, source=source)
+
+    if success:
+        print(f"\n{'='*60}")
+        print("  ✅ Pipeline completed successfully!")
+        with STATE_LOCK:
+            kpi = dict(STATE["kpi"])
+            engine = STATE.get("engine", "-")
+        print(f"  Engine: {engine}")
+        print(f"  Universe: {kpi['universe']} | Debated: {kpi['in_debate']} | BUYs: {kpi['buy_signals']}")
+        print(f"  Top Pick: {kpi['top_pick']}")
+        print(f"{'='*60}\n")
+        sys.exit(0)
+    else:
+        print(f"\n{'='*60}")
+        print("  ❌ Pipeline failed!")
+        print(f"{'='*60}\n")
+        sys.exit(1)
+
+
 # --------------------------------------------------------------------------
 # Routes
 # --------------------------------------------------------------------------
@@ -523,9 +597,7 @@ def index():
 
 @app.route("/upload_universe", methods=["POST"])
 def upload_universe():
-    """Accept an uploaded .xlsx workbook, parse its 'Final List' sheet (or the
-    first sheet with an 'NSE Code' column), and store the resulting ticker
-    list as the live-mode universe for the Excel data source."""
+    """Accept an uploaded .xlsx workbook, parse its 'Final List' sheet."""
     global EXCEL_UNIVERSE
 
     if "file" not in request.files:
@@ -565,15 +637,11 @@ def upload_universe():
     })
 
 
-
 def refresh_excel_universe_from_google():
     """Fetch the latest public Google Sheet workbook and rebuild the ticker universe."""
     global EXCEL_UNIVERSE
     if not GOOGLE_SHEET_ID:
         return False
-    # Google exposes a public spreadsheet as an XLSX export. This means the
-    # dashboard reads the current sheet every time instead of using yesterday's
-    # uploaded copy.
     url = f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/export?format=xlsx"
     req = urllib.request.Request(
         url,
@@ -597,7 +665,7 @@ def refresh_excel_universe_from_google():
 
 @app.route("/refresh_google_data", methods=["POST"])
 def refresh_google_data():
-    """Accept Google Visualization data fetched by the browser. This avoids DNS/network issues in the Python process."""
+    """Accept Google Visualization data fetched by the browser."""
     global EXCEL_UNIVERSE
     try:
         payload = request.get_json(silent=True) or {}
@@ -695,8 +763,6 @@ def start():
 
     if mode == "live" and source == "excel":
         try:
-            # Primary source: the user's live-updating Google Sheet.
-            # Local uploaded Excel remains a fallback if Google Sheets is unavailable.
             try:
                 refresh_excel_universe_from_google()
                 log_line(
@@ -738,8 +804,25 @@ def config():
     })
 
 
+# --------------------------------------------------------------------------
+# Main entry point
+# --------------------------------------------------------------------------
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=f"{BRAND} Stock Dashboard")
+    parser.add_argument("--cli", action="store_true", help="Run in CLI mode (GitHub Actions)")
+    parser.add_argument("--mode", default="live", choices=["demo", "live"], help="Pipeline mode")
+    parser.add_argument("--source", default="excel", choices=["manual", "excel"], help="Data source")
+    parser.add_argument("--provider", default=None, help="LLM provider (openai/anthropic/claude_code)")
+    args = parser.parse_args()
+
     init_db()
     load_excel_universe_from_disk()
-    print(f"\n{BRAND} starting on http://127.0.0.1:{PORT}\n")
-    app.run(host="127.0.0.1", port=PORT, debug=False, threaded=True)
+
+    if args.cli:
+        # CLI mode: run once and exit
+        run_cli(mode=args.mode, provider=args.provider, source=args.source)
+    else:
+        # Server mode: run Flask dashboard
+        print(f"\n{BRAND} starting on http://127.0.0.1:{PORT}\n")
+        app.run(host="127.0.0.1", port=PORT, debug=False, threaded=True)

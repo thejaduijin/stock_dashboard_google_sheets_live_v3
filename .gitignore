@@ -1,0 +1,27 @@
+# Secrets & Environment
+.env
+*.json
+!example.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Generated files
+excel_final_list.xlsx
+output.json
+audit.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
