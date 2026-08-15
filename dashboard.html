@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentDesk · Indian Stock Analysis</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root{
+    --ink:#1c2128;
+    --ink-soft:#5b6572;
+    --ink-faint:#8b95a1;
+    --paper:#fafaf8;
+    --card:#ffffff;
+    --border:#e6e5e0;
+    --accent:#1a6b4f;      /* deep evergreen - "buy" money-green, not neon */
+    --accent-soft:#e7f2ed;
+    --amber:#a3690a;
+    --amber-soft:#fbf1e0;
+    --red:#a3312a;
+    --red-soft:#fbeceb;
+    --blue:#2f5fa3;
+    --shadow: 0 1px 2px rgba(28,33,40,0.04), 0 6px 20px -8px rgba(28,33,40,0.08);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 24px 60px;}
+
+  /* ---------- Header ---------- */
+  header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:28px;}
+  .brand{display:flex;align-items:baseline;gap:12px;}
+  .brand h1{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:30px;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .brand .tagline{color:var(--ink-soft);font-size:14px;}
+  .brand .dot{color:var(--ink-faint);margin:0 2px;}
+
+  .controls-col{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+  .controls{display:flex;align-items:center;gap:10px;}
+  .excel-row{display:flex;align-items:center;gap:10px;}
+  .upload-btn{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:8px 14px;
+    font-size:12.5px;font-weight:600;color:var(--ink-soft);
+    cursor:pointer;
+    transition:border-color .15s ease, color .15s ease;
+  }
+  .upload-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .excel-status{font-size:12px;color:var(--ink-faint);}
+  .excel-status.ok{color:var(--accent);font-weight:600;}
+  .excel-status.err{color:var(--red);font-weight:600;}
+  select{
+    appearance:none;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:10px 34px 10px 14px;
+    font-family:inherit;font-size:13.5px;font-weight:500;color:var(--ink);
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%235b6572'/></svg>");
+    background-repeat:no-repeat;background-position:right 14px center;
+    cursor:pointer;
+  }
+  #startBtn{
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:11px 22px;
+    font-family:inherit;font-weight:600;font-size:14px;
+    cursor:pointer;
+    box-shadow:var(--shadow);
+    transition:transform .12s ease, background .15s ease;
+    display:flex;align-items:center;gap:8px;
+  }
+  #startBtn:hover{transform:translateY(-1px);background:#000;}
+  #startBtn:disabled{background:var(--ink-faint);cursor:not-allowed;transform:none;}
+  #startBtn .spark{font-size:15px;}
+
+  /* ---------- KPI row ---------- */
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px;}
+  .kpi{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:18px 20px;
+    box-shadow:var(--shadow);
+  }
+  .kpi .label{font-size:12px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px;}
+  .kpi .value{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:500;letter-spacing:-0.02em;}
+  .kpi .value.small{font-size:20px;}
+  .kpi.buy .value{color:var(--accent);}
+
+  /* ---------- Agents ---------- */
+  .section-title{font-size:13px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.07em;margin:0 0 12px 2px;}
+  .agents-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:30px;}
+  @media(max-width:900px){.agents-grid{grid-template-columns:repeat(2,1fr);} .kpi-row{grid-template-columns:repeat(2,1fr);}}
+
+  .agent-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:16px;
+    box-shadow:var(--shadow);
+    transition:border-color .2s ease, box-shadow .2s ease;
+    position:relative;
+    overflow:hidden;
+  }
+  .agent-card.working{border-color:#cfe3da;}
+  .agent-card.done{border-color:var(--border);}
+  .agent-top{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  .agent-icon{
+    width:34px;height:34px;border-radius:9px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;flex-shrink:0;
+    background:#f2f1ec;
+  }
+  .agent-name{font-weight:600;font-size:14.5px;}
+  .agent-role{font-size:12px;color:var(--ink-soft);line-height:1.4;margin:2px 0 12px;min-height:30px;}
+
+  .agent-status-row{display:flex;align-items:center;justify-content:space-between;}
+  .status-pill{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;
+    padding:4px 9px;border-radius:20px;
+  }
+  .status-pill.offline{background:#f0efec;color:var(--ink-faint);}
+  .status-pill.working{background:var(--amber-soft);color:var(--amber);}
+  .status-pill.done{background:var(--accent-soft);color:var(--accent);}
+  .status-dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+  .status-pill.working .status-dot{animation:pulse 1.1s ease-in-out infinite;}
+
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(1.5);}}
+
+  .mini-bars{display:flex;gap:2px;align-items:flex-end;height:14px;}
+  .mini-bars span{width:3px;background:var(--amber);border-radius:1px;animation:bar 0.9s ease-in-out infinite;}
+  .mini-bars span:nth-child(1){height:40%;animation-delay:0s;}
+  .mini-bars span:nth-child(2){height:100%;animation-delay:.15s;}
+  .mini-bars span:nth-child(3){height:65%;animation-delay:.3s;}
+  .mini-bars span:nth-child(4){height:85%;animation-delay:.45s;}
+  @keyframes bar{0%,100%{transform:scaleY(.4);}50%{transform:scaleY(1);}}
+
+  .agent-stats{display:flex;gap:16px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);}
+  .agent-stat{flex:1;}
+  .agent-stat .n{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:500;}
+  .agent-stat .l{font-size:10.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;margin-top:1px;}
+
+  /* ---------- Verdicts feed ---------- */
+  .feed{background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;}
+  .feed-empty{padding:40px 20px;text-align:center;color:var(--ink-faint);font-size:14px;}
+  .verdict-row{
+    display:grid;
+    grid-template-columns:52px 130px 90px 1fr 110px;
+    gap:14px;align-items:center;
+    padding:14px 20px;
+    border-bottom:1px solid var(--border);
+    animation:slidein .3s ease;
+  }
+  .verdict-row:last-child{border-bottom:none;}
+  @keyframes slidein{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+
+  .badge{
+    font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;
+    padding:5px 0;border-radius:8px;text-align:center;
+  }
+  .badge.BUY{background:var(--accent-soft);color:var(--accent);}
+  .badge.WATCH{background:var(--amber-soft);color:var(--amber);}
+  .badge.AVOID{background:var(--red-soft);color:var(--red);}
+
+  .vr-symbol{font-weight:700;font-size:14px;}
+  .vr-name{font-size:11.5px;color:var(--ink-faint);}
+  .vr-conf{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink-soft);}
+  .vr-why{font-size:12.5px;color:var(--ink-soft);line-height:1.4;}
+  .vr-price{text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;}
+  .vr-price .chg.up{color:var(--accent);}
+  .vr-price .chg.down{color:var(--red);}
+
+  /* ---------- Footer ---------- */
+  footer{margin-top:26px;text-align:center;font-size:12px;color:var(--ink-faint);}
+  footer .brand-tag{font-weight:600;color:var(--ink-soft);}
+
+  .log-toggle{font-size:12px;color:var(--ink-faint);text-align:center;margin-top:10px;cursor:pointer;text-decoration:underline;}
+  #logBox{
+    display:none;background:#161a1f;color:#c9d1d9;font-family:'JetBrains Mono',monospace;
+    font-size:12px;border-radius:10px;padding:14px 16px;margin-top:12px;max-height:220px;overflow-y:auto;line-height:1.6;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <h1 id="brandName">AgentDesk</h1>
+      <span class="tagline"><span id="tagline">Indian stock analysis</span> <span class="dot">·</span> <span id="agentCount">8</span> agents on duty</span>
+    </div>
+    <div class="controls-col">
+      <div class="controls">
+        <select id="modeSelect" onchange="onModeChange()">
+          <option value="demo" selected>Demo data (offline)</option>
+          <option value="live">Live (NSE via yfinance)</option>
+          <option value="live_excel">Live · Excel Final List</option>
+        </select>
+        <button id="startBtn" onclick="startAgents()"><span class="spark">▶</span> Start agents</button>
+      </div>
+      <div id="excelRow" class="excel-row" style="display:none;">
+        <label class="upload-btn" for="excelFile">
+          <span id="uploadLabel">⬆ Upload / Replace Excel</span>
+        </label>
+        <button type="button" class="upload-btn" onclick="refreshGoogleSheet()">↻ Sync Google Sheet</button>
+        <input type="file" id="excelFile" accept=".xlsx,.xlsm" onchange="uploadExcel()" style="display:none;">
+        <span id="excelStatus" class="excel-status"></span>
+      </div>
+    </div>
+  </header>
+
+  <div class="section-title">Overview</div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="label">Universe</div><div class="value" id="kpiUniverse">0</div></div>
+    <div class="kpi"><div class="label">In debate</div><div class="value" id="kpiDebate">0</div></div>
+    <div class="kpi buy"><div class="label">Buy signals</div><div class="value" id="kpiBuy">0</div></div>
+    <div class="kpi"><div class="label">Top pick</div><div class="value small" id="kpiTop">-</div></div>
+  </div>
+
+  <div class="section-title">Agent panel</div>
+  <div class="agents-grid" id="agentsGrid"></div>
+
+  <div class="section-title">Latest verdicts</div>
+  <div class="feed" id="feed">
+    <div class="feed-empty">No verdicts yet — click “Start agents” to run a cycle.</div>
+  </div>
+
+  <div class="log-toggle" onclick="toggleLog()">show run log</div>
+  <div id="logBox"></div>
+
+  <footer>
+    Built from <span id="footUniverse">0</span> real stocks · data pulled <span id="footTimestamp">—</span> · engine: <span id="footEngine">—</span>
+  </footer>
+
+</div>
+
+<script>
+const ICONS = {
+  scout: "🔭", technician: "📈", fundamentalist: "🧮", newsdesk: "📰",
+  bull: "🐂", bear: "🐻", judge: "⚖️", messenger: "📨"
+};
+const AGENT_ORDER = ["scout","technician","fundamentalist","newsdesk","bull","bear","judge","messenger"];
+
+let polling = null;
+let logShown = false;
+
+function toggleLog(){
+  logShown = !logShown;
+  document.getElementById('logBox').style.display = logShown ? 'block' : 'none';
+}
+
+async function loadConfig(){
+  try{
+    const res = await fetch('/config');
+    const cfg = await res.json();
+    document.getElementById('brandName').textContent = cfg.brand;
+    document.title = cfg.brand + " · Indian Stock Analysis";
+    document.getElementById('agentCount').textContent = cfg.agent_count;
+  }catch(e){}
+}
+
+function onModeChange(){
+  const mode = document.getElementById('modeSelect').value;
+  document.getElementById('excelRow').style.display = (mode === 'live_excel') ? 'flex' : 'none';
+  if(mode === 'live_excel') refreshUniverseStatus();
+}
+
+async function refreshUniverseStatus(){
+  try{
+    const res = await fetch('/universe_status?_=' + Date.now(), {cache:'no-store'});
+    const s = await res.json();
+    const el = document.getElementById('excelStatus');
+    if(s.loaded){
+      el.textContent = `${s.count} tickers loaded from "${s.sheet}" (${s.filename})`;
+      el.className = 'excel-status ok';
+    }else{
+      el.textContent = 'No list uploaded yet';
+      el.className = 'excel-status';
+    }
+  }catch(e){}
+}
+
+async function uploadExcel(){
+  const input = document.getElementById('excelFile');
+  const file = input.files[0];
+  if(!file) return;
+  const label = document.getElementById('uploadLabel');
+  const status = document.getElementById('excelStatus');
+  label.textContent = 'Uploading…';
+  status.textContent = '';
+  status.className = 'excel-status';
+
+  const form = new FormData();
+  form.append('file', file);
+  try{
+    const res = await fetch('/upload_universe', {method:'POST', body: form});
+    const data = await res.json();
+    if(!res.ok || !data.ok){
+      status.textContent = data.error || 'Upload failed.';
+      status.className = 'excel-status err';
+    }else{
+      status.textContent = `${data.count} tickers loaded from "${data.sheet}"`;
+      status.className = 'excel-status ok';
+    }
+  }catch(e){
+    status.textContent = 'Upload failed — could not reach server.';
+    status.className = 'excel-status err';
+  }
+  label.textContent = '⬆ Upload / Replace Excel';
+  if(data && data.ok) refreshUniverseStatus();
+  input.value = '';
+}
+
+async function refreshGoogleSheet(){
+  const status = document.getElementById('excelStatus');
+  status.textContent = 'Syncing Google Sheet…';
+  status.className = 'excel-status';
+  return new Promise((resolve) => {
+    const callbackName = '__stockSheetCallback_' + Date.now();
+    const script = document.createElement('script');
+    let finished = false;
+    const done = (ok) => {
+      if(finished) return;
+      finished = true;
+      clearTimeout(timer);
+      delete window[callbackName];
+      script.remove();
+      resolve(ok);
+    };
+    window[callbackName] = async (payload) => {
+      try{
+        const res = await fetch('/refresh_google_data?_=' + Date.now(), {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          cache:'no-store',
+          body: JSON.stringify({
+            table: payload.table,
+            sheet: 'Final List'
+          })
+        });
+        const data = await res.json();
+        if(!res.ok || !data.ok){
+          status.textContent = data.error || 'Google Sheet sync failed.';
+          status.className = 'excel-status err';
+          done(false);
+          return;
+        }
+        status.textContent = `${data.count} tickers synced from Google Sheets`;
+        status.className = 'excel-status ok';
+        refreshUniverseStatus();
+        done(true);
+      }catch(e){
+        status.textContent = 'Google Sheet sync failed while sending data to dashboard.';
+        status.className = 'excel-status err';
+        done(false);
+      }
+    };
+    script.onerror = () => {
+      status.textContent = 'Google Sheet could not be accessed. Check the sheet link and sharing settings.';
+      status.className = 'excel-status err';
+      done(false);
+    };
+    const timer = setTimeout(() => {
+      status.textContent = 'Google Sheet sync timed out. Check sharing/access.';
+      status.className = 'excel-status err';
+      done(false);
+    }, 15000);
+    script.src = 'https://docs.google.com/spreadsheets/d/1_VnJzEdeMlqLqISrlLDG8MCEbhkJWimndxKVx-_U1mY/gviz/tq' +
+      '?tqx=' + encodeURIComponent('responseHandler:' + callbackName) +
+      '&sheet=' + encodeURIComponent('Final List') + '&_=' + Date.now();
+    document.head.appendChild(script);
+  });
+}
+
+
+// Keep the displayed Final List aligned with the live Google Sheet.
+// The actual Live Excel run also performs a fresh sync immediately before starting.
+setInterval(() => {
+  if (document.visibilityState === 'visible') refreshGoogleSheet();
+}, 5 * 60 * 1000);
+
+function renderAgents(agents){
+  const grid = document.getElementById('agentsGrid');
+  grid.innerHTML = AGENT_ORDER.map(id => {
+    const a = agents[id];
+    if(!a) return '';
+    const statusHtml = a.status === 'working'
+      ? `<span class="status-pill working"><span class="status-dot"></span>working</span><div class="mini-bars"><span></span><span></span><span></span><span></span></div>`
+      : a.status === 'done'
+        ? `<span class="status-pill done"><span class="status-dot"></span>done</span>`
+        : `<span class="status-pill offline"><span class="status-dot"></span>offline</span>`;
+    return `
+    <div class="agent-card ${a.status}">
+      <div class="agent-top">
+        <div class="agent-icon">${ICONS[id] || '●'}</div>
+        <div class="agent-name">${a.name}</div>
+      </div>
+      <div class="agent-role">${a.role}</div>
+      <div class="agent-status-row">${statusHtml}</div>
+      <div class="agent-stats">
+        <div class="agent-stat"><div class="n">${a.stat1}</div><div class="l">${a.stat1_label}</div></div>
+        <div class="agent-stat"><div class="n">${a.stat2}</div><div class="l">${a.stat2_label}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderKpi(kpi){
+  document.getElementById('kpiUniverse').textContent = kpi.universe;
+  document.getElementById('kpiDebate').textContent = kpi.in_debate;
+  document.getElementById('kpiBuy').textContent = kpi.buy_signals;
+  document.getElementById('kpiTop').textContent = kpi.top_pick;
+}
+
+function fmtPrice(v){
+  if(v === null || v === undefined) return '—';
+  return '₹' + Number(v).toLocaleString('en-IN', {maximumFractionDigits:2});
+}
+function fmtChg(v){
+  if(v === null || v === undefined) return '—';
+  const sign = v >= 0 ? '+' : '';
+  return `${sign}${v}%`;
+}
+
+function renderFeed(verdicts){
+  const feed = document.getElementById('feed');
+  if(!verdicts || verdicts.length === 0){
+    feed.innerHTML = '<div class="feed-empty">No verdicts yet — click “Start agents” to run a cycle.</div>';
+    return;
+  }
+  feed.innerHTML = verdicts.map(v => `
+    <div class="verdict-row">
+      <div class="badge ${v.verdict}">${v.verdict}</div>
+      <div>
+        <div class="vr-symbol">${v.symbol}</div>
+        <div class="vr-name">${v.name || ''}</div>
+      </div>
+      <div class="vr-conf">${v.confidence}/10</div>
+      <div class="vr-why">${v.rationale || v.key_catalyst || ''}</div>
+      <div class="vr-price">
+        ${fmtPrice(v.live_price)}<br>
+        <span class="chg ${(v.day_change_pct||0) >= 0 ? 'up':'down'}">${fmtChg(v.day_change_pct)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderLog(log){
+  const box = document.getElementById('logBox');
+  box.innerHTML = (log || []).map(l => `<div>${l}</div>`).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function poll(){
+  try{
+    const res = await fetch('/status?_=' + Date.now(), {cache:'no-store'});
+    const s = await res.json();
+    renderAgents(s.agents);
+    renderKpi(s.kpi);
+    renderFeed(s.verdicts);
+    renderLog(s.log);
+    document.getElementById('footUniverse').textContent = s.kpi.universe || 0;
+    document.getElementById('footTimestamp').textContent = s.data_timestamp || '—';
+    document.getElementById('footEngine').textContent = s.engine || '—';
+
+    const btn = document.getElementById('startBtn');
+    if(s.running){
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spark">●</span> Running…';
+    }else{
+      btn.disabled = false;
+      btn.innerHTML = '<span class="spark">▶</span> Start agents';
+      if(polling){ clearInterval(polling); polling = null; }
+    }
+  }catch(e){
+    console.error(e);
+  }
+}
+
+async function startAgents(){
+  const selected = document.getElementById('modeSelect').value;
+  const mode = (selected === 'live_excel') ? 'live' : selected;
+  const source = (selected === 'live_excel') ? 'excel' : 'manual';
+  const btn = document.getElementById('startBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spark">●</span> Starting…';
+  try{
+    if(selected === 'live_excel'){
+      const synced = await refreshGoogleSheet();
+      if(!synced){
+        btn.disabled = false;
+        btn.innerHTML = '<span class="spark">▶</span> Start agents';
+        return;
+      }
+    }
+    const res = await fetch('/start', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({mode, source})
+    });
+    if(!res.ok){
+      const err = await res.json();
+      alert(err.error || 'Could not start run.');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="spark">▶</span> Start agents';
+      return;
+    }
+  }catch(e){
+    alert('Failed to sync Google Sheet or reach server.');
+    btn.disabled = false;
+    btn.innerHTML = '<span class="spark">▶</span> Start agents';
+    return;
+  }
+  if(polling) clearInterval(polling);
+  polling = setInterval(poll, 500);
+  poll();
+}
+
+
+loadConfig();
+poll();
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "large": [
+    {"symbol": "RELIANCE.NS", "name": "Reliance Industries"},
+    {"symbol": "TCS.NS", "name": "Tata Consultancy Services"},
+    {"symbol": "HDFCBANK.NS", "name": "HDFC Bank"},
+    {"symbol": "ICICIBANK.NS", "name": "ICICI Bank"},
+    {"symbol": "INFY.NS", "name": "Infosys"},
+    {"symbol": "LT.NS", "name": "Larsen & Toubro"},
+    {"symbol": "BHARTIARTL.NS", "name": "Bharti Airtel"},
+    {"symbol": "ITC.NS", "name": "ITC"}
+  ],
+  "mid": [
+    {"symbol": "ZENTECH.NS", "name": "Zen Technologies"},
+    {"symbol": "KAYNES.NS", "name": "Kaynes Technology"},
+    {"symbol": "SUZLON.NS", "name": "Suzlon Energy"},
+    {"symbol": "PGEL.NS", "name": "PG Electroplast"},
+    {"symbol": "KEC.NS", "name": "KEC International"},
+    {"symbol": "FORCEMOT.NS", "name": "Force Motors"},
+    {"symbol": "PRAJIND.NS", "name": "Praj Industries"},
+    {"symbol": "SENCO.NS", "name": "Senco Gold"}
+  ],
+  "small": [
+    {"symbol": "BIRLASOFT.NS", "name": "Birlasoft"},
+    {"symbol": "GRSE.NS", "name": "Garden Reach Shipbuilders"},
+    {"symbol": "MAZDOCK.NS", "name": "Mazagon Dock Shipbuilders"},
+    {"symbol": "COCHINSHIP.NS", "name": "Cochin Shipyard"},
+    {"symbol": "IRCON.NS", "name": "IRCON International"},
+    {"symbol": "RVNL.NS", "name": "Rail Vikas Nigam"},
+    {"symbol": "HUDCO.NS", "name": "HUDCO"},
+    {"symbol": "IREDA.NS", "name": "IREDA"}
+  ]
+}
