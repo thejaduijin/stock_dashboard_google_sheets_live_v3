@@ -41,9 +41,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # ─────────────────────────────────────────────
-  # JOB 1: Full Pipeline (default)
-  # ─────────────────────────────────────────────
   build-pipeline:
     name: Build Stock Dashboard
     runs-on: ubuntu-latest
@@ -62,6 +59,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -79,20 +79,29 @@ jobs:
           echo "Starting Stock Dashboard Pipeline..."
           python app.py --cli --mode live --source excel --provider ${{ secrets.LLM_PROVIDER || 'openai' }}
           echo "Pipeline completed!"
+        continue-on-error: true
 
-      - name: Generate static dashboard
+      - name: Build static site
         run: |
-          echo "Building static dashboard..."
-          python build_static_dashboard.py
-          echo "Static dashboard built!"
+          echo "Building static site..."
+          mkdir -p _site
 
-      - name: Copy search-enabled dashboard
-        run: |
-          # Copy the search-enabled index.html to _site
+          # Copy the search-enabled dashboard
           cp index.html _site/index.html
-          # Also copy output.json for pipeline data display
-          cp output.json _site/output.json 2>/dev/null || true
-          echo "Search-enabled dashboard ready!"
+
+          # Copy output.json if it exists (from pipeline run)
+          if [ -f output.json ]; then
+            cp output.json _site/output.json
+            echo "Copied output.json"
+          else
+            echo "output.json not found - pipeline may have failed"
+            # Create empty output.json so the dashboard loads
+            echo '{"timestamp":"'$(date -Iseconds)'","engine":"-","kpi":{"universe":0,"in_debate":0,"buy_signals":0,"top_pick":"-","top_pick_confidence":0},"verdicts":[],"total_verdicts":0}' > _site/output.json
+          fi
+
+          # List what we're deploying
+          echo "Files in _site:"
+          ls -la _site/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -129,9 +138,6 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-  # ─────────────────────────────────────────────
-  # JOB 2: Single Stock Analysis (GitHub Actions)
-  # ─────────────────────────────────────────────
   analyze-single-stock:
     name: Analyze ${{ github.event.inputs.symbol }}
     runs-on: ubuntu-latest
