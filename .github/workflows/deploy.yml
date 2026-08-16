@@ -6,30 +6,8 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      mode:
-        description: 'Run mode'
-        required: true
-        default: 'full_pipeline'
-        type: choice
-        options:
-          - full_pipeline
-          - single_stock
-      symbol:
-        description: 'Stock symbol (only for single_stock mode, e.g., RELIANCE.NS)'
-        required: false
-        default: ''
-        type: string
-      provider:
-        description: 'LLM provider'
-        required: false
-        default: 'auto'
-        type: choice
-        options:
-          - auto
-          - openai
-          - anthropic
-          - claude_code
+  schedule:
+    - cron: "0 4,10 * * 1-5"
 
 permissions:
   contents: read
@@ -41,10 +19,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-pipeline:
+  build:
     name: Build Stock Dashboard
     runs-on: ubuntu-latest
-    if: github.event.inputs.mode != 'single_stock'
 
     env:
       GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
@@ -59,9 +36,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -74,34 +48,26 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install flask pandas numpy yfinance gspread google-auth openpyxl requests
 
+      - name: Run tests
+        run: |
+          if [ -f test_*.py ] || [ -f *_test.py ]; then
+            python -m pytest --tb=short
+          else
+            echo "No tests found, skipping..."
+          fi
+        continue-on-error: true
+
       - name: Run Stock Agent Pipeline
         run: |
           echo "Starting Stock Dashboard Pipeline..."
           python app.py --cli --mode live --source excel --provider ${{ secrets.LLM_PROVIDER || 'openai' }}
           echo "Pipeline completed!"
-        continue-on-error: true
 
-      - name: Build static site
+      - name: Generate static dashboard
         run: |
-          echo "Building static site..."
-          mkdir -p _site
-
-          # Copy the search-enabled dashboard
-          cp index.html _site/index.html
-
-          # Copy output.json if it exists (from pipeline run)
-          if [ -f output.json ]; then
-            cp output.json _site/output.json
-            echo "Copied output.json"
-          else
-            echo "output.json not found - pipeline may have failed"
-            # Create empty output.json so the dashboard loads
-            echo '{"timestamp":"'$(date -Iseconds)'","engine":"-","kpi":{"universe":0,"in_debate":0,"buy_signals":0,"top_pick":"-","top_pick_confidence":0},"verdicts":[],"total_verdicts":0}' > _site/output.json
-          fi
-
-          # List what we're deploying
-          echo "Files in _site:"
-          ls -la _site/
+          echo "Building static dashboard from output.json..."
+          python build_static_dashboard.py
+          echo "Static dashboard built!"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -119,11 +85,10 @@ jobs:
         with:
           path: _site
 
-  deploy-pipeline:
+  deploy:
     name: Deploy to GitHub Pages
-    needs: build-pipeline
+    needs: build
     runs-on: ubuntu-latest
-    if: github.event.inputs.mode != 'single_stock'
 
     environment:
       name: github-pages
@@ -137,41 +102,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-  analyze-single-stock:
-    name: Analyze ${{ github.event.inputs.symbol }}
-    runs-on: ubuntu-latest
-    if: github.event.inputs.mode == 'single_stock'
-
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      LLM_PROVIDER: ${{ github.event.inputs.provider == 'auto' && secrets.LLM_PROVIDER || github.event.inputs.provider }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install pandas numpy yfinance openpyxl requests
-
-      - name: Analyze stock
-        run: |
-          echo "Analyzing ${{ github.event.inputs.symbol }}..."
-          python single_stock.py "${{ github.event.inputs.symbol }}" --provider ${{ github.event.inputs.provider == 'auto' && 'openai' || github.event.inputs.provider }} --save
-
-      - name: Upload analysis result
-        uses: actions/upload-artifact@v4
-        with:
-          name: stock-analysis-${{ github.event.inputs.symbol }}
-          path: analysis_*.json
-          retention-days: 30
