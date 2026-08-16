@@ -592,6 +592,10 @@ def run_cli(mode="live", provider=None, source="excel"):
 
 @app.route("/")
 def index():
+    return send_from_directory(BASE_DIR, "index.html")
+
+@app.route("/dashboard")
+def old_dashboard():
     return send_from_directory(BASE_DIR, "dashboard.html")
 
 
@@ -788,6 +792,70 @@ def status():
     with STATE_LOCK:
         return jsonify(STATE)
 
+
+
+@app.route("/search_stock", methods=["POST"])
+def search_stock():
+    """API endpoint for frontend stock search. Returns analysis for a single stock."""
+    payload = request.get_json(silent=True) or {}
+    symbol = payload.get("symbol", "").strip().upper()
+    provider = payload.get("provider") or None
+
+    if not symbol:
+        return jsonify({"ok": False, "error": "No symbol provided"}), 400
+
+    try:
+        # Build evidence bundle for the stock
+        bundles = data_sources.build_bundles_for_tickers([symbol], cap_segment="search")
+        if not bundles:
+            return jsonify({"ok": False, "error": f"Could not fetch data for {symbol}"}), 404
+
+        evidence = bundles[0]
+
+        # Run LLM analysis
+        try:
+            result = llm.evaluate(evidence, provider=provider)
+            engine_used = result.get("_engine", "unknown")
+        except Exception:
+            import scoring
+            result = scoring.evaluate_deterministic(evidence)
+            result["_engine"] = "deterministic"
+            engine_used = "deterministic"
+
+        scores = result.get("scores", {})
+        verdict = result.get("verdict", {})
+        price = evidence.get("price", {})
+        tech = evidence.get("technicals", {})
+        analyst = evidence.get("analyst", {})
+        news = evidence.get("news", {})
+
+        return jsonify({
+            "ok": True,
+            "symbol": symbol,
+            "name": evidence.get("name", symbol),
+            "engine": engine_used,
+            "price": price,
+            "technicals": tech,
+            "analyst": analyst,
+            "news": news,
+            "scores": scores,
+            "verdict": verdict,
+            "summary": {
+                "bull_score": scores.get("bull", {}).get("score", 0),
+                "bear_score": scores.get("bear", {}).get("score", 0),
+                "technician_score": scores.get("technician", {}).get("score", 0),
+                "fundamentalist_score": scores.get("fundamentalist", {}).get("score", 0),
+                "newsdesk_score": scores.get("newsdesk", {}).get("score", 0),
+                "final_verdict": verdict.get("verdict", "WATCH"),
+                "confidence": verdict.get("confidence", 0),
+                "winner": verdict.get("winner", "-"),
+                "rationale": verdict.get("rationale", ""),
+                "key_catalyst": verdict.get("key_catalyst", ""),
+                "net": verdict.get("net", 0),
+            }
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/config")
 def config():
