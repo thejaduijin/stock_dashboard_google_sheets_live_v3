@@ -2,18 +2,18 @@
   "sheet": "Final List",
   "tickers": [
     {
-      "symbol": "ASHOKLEY.NS",
-      "name": "ASHOKLEY",
-      "car": "Buy/Average Out"
-    },
-    {
       "symbol": "SBIN.NS",
       "name": "SBIN",
       "car": "Buy/Average Out"
     },
     {
-      "symbol": "TECHM.NS",
-      "name": "TECHM",
+      "symbol": "ASHOKLEY.NS",
+      "name": "ASHOKLEY",
+      "car": "Buy/Average Out"
+    },
+    {
+      "symbol": "M&M.NS",
+      "name": "M&M",
       "car": "Buy/Average Out"
     },
     {
@@ -22,13 +22,8 @@
       "car": "Buy/Average Out"
     },
     {
-      "symbol": "HINDALCO.NS",
-      "name": "HINDALCO",
-      "car": "Buy/Average Out"
-    },
-    {
-      "symbol": "M&M.NS",
-      "name": "M&M",
+      "symbol": "TECHM.NS",
+      "name": "TECHM",
       "car": "Buy/Average Out"
     },
     {
@@ -47,38 +42,8 @@
       "car": "Buy/Average Out"
     },
     {
-      "symbol": "KRBL.NS",
-      "name": "KRBL",
-      "car": "Buy/Average Out"
-    },
-    {
-      "symbol": "CONCOR.NS",
-      "name": "CONCOR",
-      "car": "Buy/Average Out"
-    },
-    {
-      "symbol": "HYUNDAI.NS",
-      "name": "HYUNDAI",
-      "car": "Buy/Average Out"
-    },
-    {
-      "symbol": "PNB.NS",
-      "name": "PNB",
-      "car": "Buy/Average Out"
-    },
-    {
-      "symbol": "PETRONET.NS",
-      "name": "PETRONET",
-      "car": "Buy/Average Out"
-    },
-    {
-      "symbol": "MEESHO.NS",
-      "name": "MEESHO",
-      "car": "Buy/Average Out"
-    },
-    {
-      "symbol": "CIPLA.NS",
-      "name": "CIPLA",
+      "symbol": "UNOMINDA.NS",
+      "name": "UNOMINDA",
       "car": "Buy/Average Out"
     },
     {
@@ -87,13 +52,48 @@
       "car": "Buy/Average Out"
     },
     {
+      "symbol": "BAJAJHLDNG.NS",
+      "name": "BAJAJHLDNG",
+      "car": "Buy/Average Out"
+    },
+    {
+      "symbol": "PRESTIGE.NS",
+      "name": "PRESTIGE",
+      "car": "Buy/Average Out"
+    },
+    {
       "symbol": "GODREJPROP.NS",
       "name": "GODREJPROP",
+      "car": "Buy/Average Out"
+    },
+    {
+      "symbol": "PNB.NS",
+      "name": "PNB",
+      "car": "Buy/Average Out"
+    },
+    {
+      "symbol": "360ONE.NS",
+      "name": "360ONE",
+      "car": "Buy/Average Out"
+    },
+    {
+      "symbol": "HYUNDAI.NS",
+      "name": "HYUNDAI",
+      "car": "Buy/Average Out"
+    },
+    {
+      "symbol": "CIPLA.NS",
+      "name": "CIPLA",
+      "car": "Buy/Average Out"
+    },
+    {
+      "symbol": "INDIANB.NS",
+      "name": "INDIANB",
       "car": "Buy/Average Out"
     }
   ],
   "filename": "Google Sheets \u2014 live source",
-  "uploaded_at": "2026-08-17T00:34:06.812922",
+  "uploaded_at": "2026-08-17T21:32:57.787500",
   "source": "google_sheets",
   "spreadsheet_id": "1_VnJzEdeMlqLqISrlLDG8MCEbhkJWimndxKVx-_U1mY"
 }
